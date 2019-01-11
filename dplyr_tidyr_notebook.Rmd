@@ -1,0 +1,243 @@
+---
+title: "R Notebook"
+output:
+  html_document:
+    df_print: paged
+---
+ Knit to HTML so that you can see the clean version 
+
+
+```{r}
+library(dplyr)
+library(gapminder)
+data ("gapminder")
+attach(gapminder)
+
+head(gapminder)
+
+```
+Loaded the gapminder data, now manipulate in dplyr
+
+```{r}
+gap<-gapminder
+rm(gapminder)
+
+mean(gap[gap$continent=="Africa", "gdpPercap"]$gdpPercap) #averaging the gdpPercap columns with Africa
+mean(gap$gdpPercap[continent=="Africa"]) #same but shorter code
+
+```
+```{r}
+#####work with data in dplyr
+
+ncol(gap)
+names(gap)
+
+subset_gap <- gap %>% select(year, country, gdpPercap) #only selects those columns, all rows
+subset_gap
+
+```
+
+select() subsets data columns
+
+
+filter() subsets data rows
+
+```{r}
+year_country_gdp_euro <-gap %>%
+  filter(continent=="Europe") %>%
+  select(year, country, gdpPercap)
+
+year_country_gdp_euro
+
+```
+
+Write a command with pipes that filters the gapminder dataset to only include data from 2007 in Africa, and then select the year, country, and lifeExp columns. 
+```{r}
+names(gap)
+practice <-gap %>%
+  filter(year==2007, continent == "Africa") %>% #selects all rows where Year is 2007 and continent is Africa
+  select(year, country, lifeExp) #selects these columns
+
+dim(practice)
+
+```
+
+
+group_by() subsets your data by chunking it based on a column
+turns a single data frame into a set of data frames subset by some variable
+
+
+```{r}
+head(gap)
+print(names(gap))
+
+str(gap)
+
+gap_by_continent <- gap %>% group_by(continent) #group by continent
+str(gap_by_continent)
+
+#returns the mean gdp per capita for each continent
+gdp_by_continent <- gap_by_continent %>%
+  summarize(mean_gdpPercap=mean(gdpPercap))
+
+
+
+
+
+```
+
+Let's compute the average life expectancy across all African countries by year.  In how many years did average African life expectancy decrease?
+
+```{r}
+
+{average_life_exp <-gap %>%
+  filter(continent == "Africa") %>% #selects all rows where continent is Africa
+  group_by(year) %>%
+  summarize(mean_lifeExp=mean(lifeExp)) 
+  print(average_life_exp)}
+
+
+```
+
+Average life exp per country, which has longest and shortest?
+
+```{r}
+
+life_exp_avg<-gap%>%
+  group_by(country)%>%
+  summarize(life_exp=mean(lifeExp))
+
+life_exp_avg%>% filter(life_exp ==min(life_exp)) #returns Sierra Leone, lowest life exp
+
+life_exp_avg%>% filter(life_exp==max(life_exp)) #returns Iceland
+
+```
+
+mutate() allows you to add a column to a data frame
+Note: you can also do
+datafram$newcolumn<-newcolumn
+
+```{r}
+bill_gdp<- gap%>% 
+  filter(year==2007)%>%
+  mutate(billion_gdp = gdpPercap * pop /10^9) %>%
+  select (continent, country, billion_gdp)
+print(bill_gdp)
+
+```
+
+
+
+
+```{r}
+std_er<-function(sample_size, sd){
+  se <- (sd/sqrt(sample_size))
+  return(se)
+}
+
+gdp_by_cont<- gap %>%
+  group_by(continent, year) %>%
+  summarize(mean_gdp=mean(gdpPercap),
+            sd_gdp =sd(gdpPercap),
+            mean_pop=mean(pop),
+            sample_size = n() )#function n counts the sample size of variable grouped by
+           
+sd_gdp <- sd(gdpPercap)
+sample_size <- gdp_by_cont$sample_size
+serr_gdp<-(sd_gdp/sqrt(sample_size))
+
+```
+
+
+Combining dplyr with ggplot2
+
+```{r}
+library(ggplot2)
+gap %>% filter(continent=="Asia")%>%
+  ggplot(aes(x=gdpPercap, y= lifeExp))+
+  geom_point()+
+  labs(x="gdp per capita", y="Life Expectancy (years)")
+
+```
+
+
+
+Using tidyr
+on wide vs long data frames. First we open gapminder in wide format
+
+```{r}
+View(gapwide)
+
+gap_wide<- read.csv("data/gapminder_wide.csv", stringsAsFactors = FALSE)
+
+colnames(gap_wide)
+dim(gap_wide)
+
+```
+
+
+
+Want to change a wide format to a long format to make R happy
+
+```{r}
+gap_long<-gap_wide %>%
+  gather(obstype_year, obs_values, -continent, -country)
+
+gap_long<- gap_long %>%
+  separate(obstype_year, into = c("obs_type", "year"), 
+           sep="_") #separates by the underscore symbol
+
+gap_long$year<-as.integer(gap_long$year) #change year from a character to an integer
+
+
+
+```
+Using the gap_long dataset, summarize the mean life expectancy by continent.
+
+```{r}
+sum_life<-gap_long %>%
+  group_by(continent) %>%
+  filter(obs_type=="lifeExp") %>%
+  summarize(mean_life = mean(obs_values))
+
+#can also filter first and then group the data, it works either way
+
+```
+
+
+
+Now we will use spread to move the data apart so it makes more sense to look at
+```{r}
+str(gap_long)
+gap_normal<- gap_long %>%
+  spread(obs_type, obs_values)
+str(gap_normal)
+
+names(gap_long)
+
+
+
+gap_normal <- gap_normal[,names(gap)]
+
+names(gap_normal)
+
+all.equal(gap, gap_normal) #asks R, are these two data frames equal?, NO they are not
+
+head(gap)
+head(gap_normal)
+
+
+gap_normal <- gap_normal %>%
+  arrange(country, continent, year)
+
+
+```
+
+for help file you can go to Help tab at top of the R studio, and click cheat sheets, dplyr and it visually shows how to use the functions
+
+
+
+
+
+
+
